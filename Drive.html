@@ -1,0 +1,214 @@
+<html>
+  <head>
+  <script src="lib/item-mirror.js" type="text/javascript"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script type="text/javascript">
+      // Your Client ID can be retrieved from your project in the Google
+      // Developer Console, https://console.developers.google.com
+      var CLIENT_ID = '681676105907-omec1itmltlnknrdfo150qcn7pdt95ri.apps.googleusercontent.com';
+
+      var SCOPES = ['https://www.googleapis.com/auth/drive'];
+      var im,
+      store,
+      rootMirror,
+      previous,
+      associations,
+      dropboxClientCredentials,
+      selectedAssociation
+
+      var googAuth;
+    var authenticatedClient = null
+
+    function getClient () {
+      return authenticatedClient
+    }
+    /**
+     * Check if current user has authorized this application.
+     */
+    function checkAuth() {
+     gapi.load('auth2', function () {
+             gapi.auth2.init({
+               'client_id': CLIENT_ID,
+               'scope': SCOPES.join(' '),
+               'immediate': true
+             })}); 
+    	 gapi.auth.authorize(
+        {
+          'client_id': CLIENT_ID,
+          'scope': SCOPES.join(' '),
+          'immediate': true
+        }, handleAuthResult);
+    }
+
+    /**
+     * Handle response from authorization server.
+     *
+     * @param {Object} authResult Authorization result.
+     */
+    function handleAuthResult(authResult) {
+      var authorizeDiv = document.getElementById('authorize-div');
+      if (authResult && !authResult.error) {
+        // Hide auth UI, then load client library.
+        authorizeDiv.style.display = 'none';
+        loadDriveApi();
+      } else {
+        // Show auth UI, allowing the user to initiate authorization by
+        // clicking authorize button.
+        authorizeDiv.style.display = 'inline';
+      }
+    }
+
+    /**
+     * Initiate auth flow in response to user clicking authorize button.
+     *
+     * @param {Event} event Button click event.
+     */
+    function handleAuthClick(event) {
+    	 
+      gapi.auth.authorize(
+        {client_id: CLIENT_ID, scope: SCOPES, immediate: false},
+        handleAuthResult);
+      return false;
+    }
+
+    /**
+     * Load Drive API client library.
+     */
+    function loadDriveApi() {
+      gapi.client.load('drive', 'v2', connectDrive);
+    }
+
+    /**
+     * Print files.
+     */
+    function listFiles() {
+      var request = gapi.client.drive.files.list({
+          'pageSize': 10,
+          'fields': "nextPageToken, files(id, name)"
+        });
+
+        request.execute(function(resp) {
+          appendPre('Files:');
+          var files = resp.files;
+          if (files && files.length > 0) {
+            for (var i = 0; i < files.length; i++) {
+              var file = files[i];
+              appendPre(file.name + ' (' + file.id + ')');
+            }
+          } else {
+            appendPre('No files found.');
+          }
+        });
+    }
+
+    /**
+     * Append a pre element to the body containing the given message
+     * as its text node.
+     *
+     * @param {string} message Text to be placed in pre element.
+     */
+    function appendPre(message) {
+      var pre = document.getElementById('output');
+      var textContent = document.createTextNode(message + '\n');
+      pre.appendChild(textContent);
+    }
+
+      
+      
+      
+      // Directs the client to Google Drive's authentication page to sign in.
+      function connectDrive () {
+        console.log('Attempting to connect');
+        store = 'Google Drive';
+
+        console.log('Successful Authentication!');
+        authenticatedClient = gapi.client;
+        // Now we start dealing with item-mirror
+        constructIMObject(store)
+      }
+
+      
+      
+   // Constructs the root ItemMirror object from the root of the Dropbox.
+      function constructIMObject (store) {debugger;
+        im = new ItemMirror('Thisisastring', function (error, newMirror) {
+          if (error) {
+            console.log(error)
+          } else {
+            im = newMirror
+            // if(pathURI == "/") {
+            //     handleLastNavigated(newMirror)
+            // }
+            // Check to see which of the returned items is the correct store, and navigate into that mirror
+            if (store) {
+              associations = im.listAssociations()
+              for (var i = 0; i < associations.length; i++) {
+                var displayText = im.getAssociationDisplayText(associations[i])
+                if (displayText == store) {
+                  navigateMirror(associations[i])
+                 
+                }
+              }
+            } else {
+             refreshIMDisplay()
+              
+            }
+          }
+        })
+      }
+      
+   // Attempts to navigate and display a new itemMirror association
+      function navigateMirror (guid) {debugger;
+        im.createItemMirrorForAssociatedGroupingItem(guid, function (error, newMirror) {
+          if (!error) {
+            im = newMirror
+            refreshIMDisplay()
+          } else {
+            console.log(error)
+          }
+        })
+      }
+      function refreshIMDisplay () {debugger;
+		/* var div= document.getElementById("authorize-div");
+		div.style.display="none"; */
+    	  associations = im.listAssociations()
+    	  var length = associations.length
+
+    	  // Grab associations and organize them by type
+    	  var groupingItems = []
+    	  var nonGroupingItems = []
+    	  for (var i = 0; i < length; i++) {
+    	    if (im.isAssociationAssociatedItemGrouping(associations[i])) {
+    	      groupingItems.push(associations[i])
+    	    } else {
+    	      nonGroupingItems.push(associations[i])
+    	    }
+    	  }
+
+    	  printAssociations(im.listAssociations())
+    	 
+    	}
+      
+      function printAssociations (associationList, div) {
+    	  console.log('ASSOCIATIONS:')
+    	  associationList.map(function(assoc) {
+    	    console.log(assoc)
+    	    console.log(im.getAssociationDisplayText(assoc))
+    	  })
+    	}
+
+    </script>
+    <script src="https://apis.google.com/js/client.js?onload=checkAuth">
+    </script>
+  </head>
+  <body>
+    <div id="authorize-div" style="display:none">
+      <span>Authorize access to Drive API</span>
+      <!--Button for the user to click to initiate auth sequence -->
+      <button id="authorize-button" onclick="handleAuthClick(event)">
+        Authorize
+      </button>
+    </div>
+    <pre id="output"></pre>
+  </body>
+</html>
